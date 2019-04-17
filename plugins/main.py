@@ -5,19 +5,49 @@ from slackbot.bot import default_reply
 from slackbot.bot import listen_to
 from .dbController import DBController
 
+"""
+内部クラス定義
+"""
+
 class WaitResponseID(IntEnum):
     NoWait = auto()
     DropTable = auto()
 
+class ResponseData:
+
+    def __init__(self):
+        self.id = WaitResponseID.NoWait
+        self.data = ""
+
+    def resetData(self):
+        self.id = WaitResponseID.NoWait
+        self.data = ""
+
+    def set(self, _id, _data):
+        self.id = _id
+        self.data = _data
+
+    def isID(self, _id):
+        return self.id == _id
+
+"""
+クラス変数定義
+"""
+
 dbController = DBController()
+responseData = ResponseData()
 
-currentWaitResponseID = WaitResponseID.NoWait
-currentWaitResponseData = ""
-
+"""
+その他定義
+"""
 
 @respond_to(".*")
 def respondYesIam(message):
     message.reply("お呼びでしょうか旦那様")
+
+"""
+DB起動／終了関連
+"""
 
 @listen_to("^[Dd][Bb][\s　]+[Ss]tart[\s　]*$")
 def startDB(message):
@@ -28,8 +58,20 @@ def stopDB(message):
     dbController.disconnect()
     message.reply("DB " + DBController.DB_NAME + " を終了しました。")
 
+def startDBIfNeed(message, showMessage = False):
+    if dbController.isConnected():
+        return
+
+    dbController.initializeDB(DBController.DB_NAME)
+    if showMessage:
+        message.reply("DB " + DBController.DB_NAME + " を初期化しました。")
+
+"""
+テーブル関連
+"""
+
 @listen_to("^[Dd][Bb][\s　]+[Tt]able[s]?[\s　][Ii]nit*$")
-@listen_to("テーブル初期化")
+@listen_to("テーブル(?:初期化|作成)")
 def initTables(message):
     dbController.createAllTablesIfNeed()
     message.reply("各種テーブルを初期化しました。")
@@ -48,34 +90,35 @@ def showTableNames(message):
 @listen_to("^[Dd][Bb][\s　]+[Tt]able[s]?[\s　]+[Dd]rop[\s　]+(.+)*$")
 @listen_to("テーブル削除[\s　]+(.+)")
 def dropTable(message, tableName):
-    currentWaitResponseData = tableName
-    currentWaitResponseID = WaitResponseID.DropTable
+    startDBIfNeed(message, False)
+
+    responseData.set(WaitResponseID.DropTable, tableName)
     message.reply("テーブル" + tableName + "を削除してよろしいでしょうか？")
 
-def confirmDropTable():
-    dbController.dropTable(tableName)
-    message.reply("テーブル" + tableName + "を削除しました。")
+    message.reply("現状のステータス : " + str(responseData.id))
+
+
+def confirmDropTable(message):
+    dbController.dropTable(responseData.data)
+    message.reply("テーブル" + responseData.data + "を削除しました。")
+
+"""
+ユーザー応答待ち関連
+"""
 
 @listen_to("(?:はい|うん|うい|[Oo][Kk]|[Oo]kay|[Yy]es|[Yy])")
 def proceedWaitResponce(message):
-    if WaitResponseID.DropTable == currentWaitResponseID:
+    if responseData.isID(WaitResponseID.DropTable):
         message.reply("テーブル削除処理を遂行します。")
-        confirmDropTable()
-    else:
+        confirmDropTable(message)
+    elif responseData.isID(WaitResponseID.NoWait):
         message.reply("特に処理待ちのものはないようですね。")
+    else:
+        message.reply("謎のステータスですわね。 現状のステータス : " + str(responseData.id))
 
 @listen_to("(?:いいえ|いや|キャンセル|[Nn][Oo]|[Cc]ancel|[Ss]top)")
 def cancelWaitResponse(message):
-    if not WaitResponseID.NoWait == currentWaitResponseID:
+    if not responseData.isID(WaitResponseID.NoWait):
         message.reply("処理をキャンセルしました。")
     else:
         message.reply("特に処理待ちのものはありませんよ？")
-
-
-def startDBIfNeed(message, showMessage = False):
-    if dbController.isConnected():
-        return
-
-    dbController.initializeDB(DBController.DB_NAME)
-    if showMessage:
-        message.reply("DB " + DBController.DB_NAME + " を初期化しました。")
