@@ -10,7 +10,7 @@ load_dotenv(env_path)
 API_TOKEN = os.environ.get("API_TOKEN")
 
 # このBotが行う処理が見つからなかった時に返すメッセージ
-DEFAULT_REPLY = "ご指示を理解できませんでした。もう一度お願いいたします。"
+DEFAULT_REPLY = "ご指示を理解できませんでした。もう一度お願いします旦那様。"
 
 # プラグインスクリプトを置いてあるサブディレクトリ名
 PLUGINS = ['plugins']
