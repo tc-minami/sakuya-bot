@@ -34,7 +34,7 @@ class DBController:
         return self.db.getTableNames()
 
     def dropTable(self, tableName, commit = True):
-        sql = "drop table " + tableName
+        sql = "drop table if exists " + tableName
         self.db.executeAndCommit(sql) if commit else self.db.execute(sql)
 
     """
