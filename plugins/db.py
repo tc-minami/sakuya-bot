@@ -1,4 +1,5 @@
 import sqlite3
+import re
 from datetime import datetime
 
 class DB:
@@ -42,21 +43,37 @@ class DB:
     SQL関連
     """
 
-    def executeAndCommit(self, sql):
+    def executeAndCommit(self, sql, data = None):
         if not self.isConnected(True):
             return False
-        self.__cursor.execute(sql)
+        self.__cursor.execute(sql) if data is None else self.__cursor.execute(sql, data)
         self.__conn.commit()
+        return self.__cursor
 
-    def execute(self, sql):
+    def execute(self, sql, data = None):
+        if not self.isConnected(True):
+            return False
+        self.__cursor.execute(sql) if data is None else self.__cursor.execute(sql, data)
+        return self.__cursor
+
+    def count(self, sql):
         if not self.isConnected(True):
             return False
         self.__cursor.execute(sql)
+        result = self.__cursor.fetchall()
+        count = 0 if result is None else len(result)
+        print("Row Count = " + str(count))
+        return str(count)
 
     def commit(self):
         if not self.isConnected(True):
             return False
         self.__conn.commit()
+
+    def fetchall(self):
+        if not self.isConnected(True):
+            return False
+        self.__cursor.fetchall()
 
     """
     Table関連
@@ -71,6 +88,12 @@ class DB:
         self.execute("select name from sqlite_master where type=\"table\"")
 
         for name in self.__cursor.fetchall():
-            result.append(name)
+            result.append(str(re.sub("^(\(\')|(\'\,\))$", "", str(name))))
 
         return result
+
+    """
+    その他Util関連
+    """
+    def createDateTimeStr(self, time = datetime.now()):
+        return time.strftime("%Y/%m/%d_%H:%M:%S")

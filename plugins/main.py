@@ -4,6 +4,7 @@ from slackbot.bot import respond_to
 from slackbot.bot import default_reply
 from slackbot.bot import listen_to
 from .dbController import DBController
+from .dbController import Status
 
 """
 内部クラス定義
@@ -12,6 +13,8 @@ from .dbController import DBController
 class WaitResponseID(IntEnum):
     NoWait = auto()
     DropTable = auto()
+    AddData = auto()
+    AddDataCategory = auto()
 
 class ResponseData:
 
@@ -43,7 +46,17 @@ responseData = ResponseData()
 
 @respond_to(".*")
 def respondYesIam(message):
-    message.reply("お呼びでしょうか旦那様")
+    message.reply("お呼びでしょうか旦那様。")
+
+# @listen_to("(.+)")
+# def listen2All(message, content):
+#     if responseData.isID(WaitResponseID.AddDataCategory):
+#         value = re.search(r"^[\s　]*(\w+)[\s　]+(\d+)[\s　]*$")
+#         message.reply
+
+@listen_to("時間")
+def showCurrentTime(message):
+    message.reply("今の時間は" + dbController.getCurrentDateTime() + "です。")
 
 """
 DB起動／終了関連
@@ -67,6 +80,34 @@ def startDBIfNeed(message, showMessage = False):
         message.reply("DB " + DBController.DB_NAME + " を初期化しました。")
 
 """
+データ関連
+"""
+# @listen_to("(?:データ)(?:.*)(?:追加|登録)")
+# def addData(message):
+#     startDBIfNeed(message, False)
+#     response = "データを追加します。追加先を選んでください。\n"
+#     response += __getTableNames(True)
+#     responseData.set(WaitResponseID.AddData)
+#     message.reply(response)
+
+@listen_to("(?:(?:追加|登録)(?:.*)カテゴリ)|(?:カテゴリ(?:.*)(?:追加|登録))[\s　]+(.+)[\s　](.+)+")
+@listen_to("(?:(?:[Aa]dd|[Rr]egister|[Ss]et])(?:.*)[Cc]ategory)|(?:[Cc]ategory(?:.*)(?:[Aa]dd|[Rr]egister|[Ss]et]))")
+def addData(message, category, sortId):
+    startDBIfNeed(message, False)
+
+    responseData.set(WaitResponseID.AddDataCategory)
+    message.reply("カテゴリ : " + category + " ソート番号 : " + sortId + " を追加します。")
+
+    dbController.addData2FamilyCategory(category, sortId, Status.Show)
+
+    result = dbController.getAllDataFromFamilyCategory()
+
+    for row in result:
+        message.reply(str(row))
+
+
+
+"""
 テーブル関連
 """
 
@@ -81,12 +122,24 @@ def initTables(message):
 @listen_to("テーブル(?:.*)表示(?:.*)一覧")
 def showTableNames(message):
     startDBIfNeed(message, False)
-
-    tableNames = dbController.getTableNames();
     result = "現在登録されているテーブルはこちらです。\n"
-    for index, name in enumerate(tableNames):
-        result += str(index) + ". " + str(name) + "\n"
+    result += __getTableNames(True)
     message.reply(str(result))
+
+def __getTableNames(showIndex = True):
+    tableNames = dbController.getTableNames();
+    result = ""
+    if showIndex:
+        for index, name in enumerate(tableNames):
+            result += str(index) + ". " + str(name) + "\n"
+    else:
+        for name in tableNames:
+            result += str(name) + "\n"
+    return result
+
+def __getTableName(index):
+    tableNames = dbController.getTableNames();
+    return tableNames[int(index)]
 
 @listen_to("^[Dd][Bb][\s　]+[Tt]able[s]?[\s　]+[Dd]rop[\s　]+(.+)*$")
 @listen_to("テーブル(?:.*)削除[\s　]+(.+)")
@@ -104,7 +157,7 @@ def confirmDropTable(message):
 ユーザー応答待ち関連
 """
 
-@listen_to("(?:いいえ|いや|キャンセル|[Nn][Oo]|[Cc]ancel|[Ss]top)")
+@listen_to("^(?:いいえ|いや|キャンセル|[Nn][Oo]|[Cc]ancel|[Ss]top)$")
 def cancelWaitResponse(message):
     if not responseData.isID(WaitResponseID.NoWait):
         message.reply("処理をキャンセルしました。")
@@ -112,8 +165,8 @@ def cancelWaitResponse(message):
         message.reply("特に処理待ちのものはありませんよ？")
     responseData.set(WaitResponseID.NoWait)
 
-@listen_to("(?:はい|うん|うい|[Oo][Kk]|[Oo]kay|[Yy]es|[Yy])")
-def proceedWaitResponce(message):
+@listen_to("^(?:はい|うん|うい|[Oo][Kk]|[Oo]kay|[Yy]es|[Yy])$")
+def proceedWaitResponse(message):
     if responseData.isID(WaitResponseID.DropTable):
         message.reply("テーブル削除処理を遂行します。")
         confirmDropTable(message)
@@ -121,3 +174,11 @@ def proceedWaitResponce(message):
         message.reply("特に処理待ちのものはないようですね。")
     else:
         message.reply("想定外の処理待ちIDですわ。旦那様処理の確認をお願いします。\n現状の処理待ちID : " + str(responseData.id))
+
+# @listen_to("^(\d+)$")
+# def proceedWaitResponseNumeric(message, index):
+#     if responseData.isID(WaitResponseID.NoWait):
+#         return
+#     elif responseData.isID(WaitResponseID.AddData):
+#         responseData.set(WaitResponseID.AddDataCategory)
+#         message.reply("テーブル" + str(__getTableName(index)) + "を選択しました。\nカテゴリ名とソート番号を指定してください。")

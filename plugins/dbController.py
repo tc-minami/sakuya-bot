@@ -1,6 +1,11 @@
+from enum import IntEnum
 from slackbot.bot import respond_to
 from slackbot.bot import listen_to
 from .db import DB
+
+class Status(IntEnum):
+    Hide = 0
+    Show = 1
 
 class DBController:
 
@@ -25,6 +30,50 @@ class DBController:
 
     def isConnected(self):
         return self.db.isConnected()
+
+    """
+    Category Table用Data操作関連
+    """
+
+    # sort_order : 0が先頭に表示される
+    def addData2FamilyCategory(self, category, sort_order, status):
+
+        count = self.db.count("select * from " + DBController.__TABLE_FAMILY_CATEGORY + " where category is '" + category + "'")
+        print("Category " + category + " の一致件数 = " + str(count))
+
+        if int(count) > 0:
+            return
+
+        count = self.db.count("select * from " + DBController.__TABLE_FAMILY_CATEGORY + " where sort_order is '" + sort_order + "'")
+        print("SortOrder " + sort_order + " の一致件数 = " + str(count))
+
+        if int(count) > 0:
+            return
+
+        sql = "insert into " + DBController.__TABLE_FAMILY_CATEGORY + " "
+        sql += """
+        (category, sort_order, status, create_at, last_update)
+        values (?, ?, ?, ?, ?)
+        """
+        timeStr = self.db.createDateTimeStr()
+        data = (category, sort_order, status, timeStr, timeStr)
+        self.db.executeAndCommit(sql, data)
+
+    def getAllDataFromFamilyCategory(self):
+        result = []
+        for row in self.db.execute("select * from " + DBController.__TABLE_FAMILY_CATEGORY + " order by sort_order asc"):
+            result.append(row)
+        return result
+
+    def countFamilyCategoryWithSortOrder(self, sortOrder):
+        self.db.execute("select count(sort_order = " + sortOrder + ") from " + __TABLE_FAMILY_CATEGORY)
+
+    """
+    汎用Table用Data操作関連
+    """
+
+    def getCurrentDateTime(self):
+        return self.db.createDateTimeStr()
 
     """
     Table操作関連
